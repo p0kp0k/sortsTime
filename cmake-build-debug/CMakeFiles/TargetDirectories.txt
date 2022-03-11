@@ -1,0 +1,3 @@
+C:/Users/artem/OneDrive/Рабочий стол/prog/sortMesure/cmake-build-debug/CMakeFiles/sortMesure.dir
+C:/Users/artem/OneDrive/Рабочий стол/prog/sortMesure/cmake-build-debug/CMakeFiles/edit_cache.dir
+C:/Users/artem/OneDrive/Рабочий стол/prog/sortMesure/cmake-build-debug/CMakeFiles/rebuild_cache.dir
