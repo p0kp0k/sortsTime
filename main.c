@@ -34,6 +34,14 @@ typedef struct GeneratingFunc {
                                          // используемое при выводе
 } GeneratingFunc;
 
+// функция сортировки
+typedef struct nCompSort {
+    long long (*nComp )(int *a, size_t n); // указатель на функцию
+    // сортировки
+    char name[64];                   // имя сортировки,
+    // используемое при выводе
+} nCompSort;
+
 void checkTime(void (*sortFunc)(int *, size_t),
                void (*generateFunc)(int *, size_t),
                size_t size, char *experimentName) {
@@ -75,6 +83,46 @@ void checkTime(void (*sortFunc)(int *, size_t),
     }
 }
 
+void checkNComp(long long (*nComp )(int *a, size_t n),
+                void (*generateFunc)(int *, size_t),
+                size_t size, char *experimentName, char *name) {
+    static size_t runCounter = 1;
+
+    // генерация последовательности
+    static int innerBuffer[100000];
+    generateFunc(innerBuffer, size);
+    printf("Run #%zu| ", runCounter++);
+    printf("Name: %s\n", experimentName);
+
+    // замер времени
+    long long nComps = nComp(innerBuffer, size);
+
+    // результаты замера
+    printf("Status: ");
+    if (isOrdered(innerBuffer, size)) {
+        printf("OK! Comps: %lld\n", nComps);
+
+        // запись в файл
+        char filename[256];
+        sprintf(filename, "./data/%s.csv",experimentName);
+        FILE *f = fopen(filename, "a");
+        if (f == NULL) {
+            printf("FileOpenError %s", filename);
+            exit(1);
+        }
+        fprintf(f, "%zu; %lld\n", size, nComps);
+        fclose(f);
+    } else {
+        printf("Wrong!\n");
+
+        // вывод массива, который не смог быть отсортирован
+        outputArray_(innerBuffer, size);
+
+        exit(1);
+    }
+}
+
+
 void selectionSort(int *a, size_t size) {
     for (int i = 0; i < size - 1; i++) {
         int minPos = i;
@@ -84,6 +132,19 @@ void selectionSort(int *a, size_t size) {
         swap(&a[i], &a[minPos], sizeof(int));
     }
 }
+
+long long selectionSortN(int *a, size_t size) {
+    long long countComp = 0;
+    for (int i = 0; i < size - 1 && ++countComp; i++) {
+        int minPos = i;
+        for (int j = i + 1; j < size && ++countComp; j++)
+            if (a[j] < a[minPos] && ++countComp)
+                minPos = j;
+        swap(&a[i], &a[minPos], sizeof(int));
+    }
+    return countComp;
+}
+
 
 void insertionSort(int *a, size_t size) {
     for (size_t i = 1; i < size; i++) {
@@ -97,11 +158,35 @@ void insertionSort(int *a, size_t size) {
     }
 }
 
+long long insertionSortN(int *a, size_t size) {
+    long long countComp = 0;
+    for (size_t i = 1; i < size && ++countComp; i++) {
+        int t = a[i];
+        size_t j = i;
+        while (j > 0 && ++countComp && a[j - 1] > t && ++countComp) {
+            a[j] = a[j - 1];
+            j--;
+        }
+        a[j] = t;
+    }
+    return countComp;
+}
+
 void bubbleSort(int *a, size_t size) {
     for (size_t i = 0; i < size - 1; i++)
         for (size_t j = size - 1; j > i; j--)
             if (a[j - 1] > a[j])
                 swap(&a[j - 1], &a[j], sizeof(int));
+}
+
+long long bubbleSortN(int *a, size_t size) {
+    long long countComp = 0;
+    for (size_t i = 0; i < size - 1 && ++countComp; i++)
+        for (size_t j = size - 1; j > i && ++countComp; j--)
+            if (a[j - 1] > a[j] && ++countComp)
+                swap(&a[j - 1], &a[j], sizeof(int));
+
+    return countComp;
 }
 
 void combsort(int *a, const size_t size) {
@@ -119,6 +204,23 @@ void combsort(int *a, const size_t size) {
     }
 }
 
+long long combsortN(int *a, const size_t size) {
+    size_t step = size;
+    int swapped = 1;
+    long long countComp = 0;
+    while (step > 1 && ++countComp || swapped && ++countComp) {
+        if (step > 1 && ++countComp)
+            step /= 1.24733;
+        swapped = 0;
+        for (size_t i = 0, j = i + step; j < size && ++countComp; ++i, ++j)
+            if (a[i] > a[j] && ++countComp) {
+                swap(&a[i], &a[j], sizeof(int));
+                swapped = 1;
+            }
+    }
+    return countComp;
+}
+
 void shellSort(int *a, size_t size) {
     for (size_t step = size / 2; step > 0; step /= 2)
         for (size_t i = step; i < size; i++) {
@@ -133,6 +235,24 @@ void shellSort(int *a, size_t size) {
             a[j] = tmp;
         }
 }
+
+long long shellSortN(int *a, size_t size) {
+    long long countComp = 0;
+    for (size_t step = size / 2; step > 0 && ++countComp; step /= 2)
+        for (size_t i = step; i < size && ++countComp; i++) {
+            int tmp = a[i];
+            size_t j;
+            for (j = i; j >= step && ++countComp; j -= step) {
+                if (tmp < a[j - step]&&++countComp)
+                    a[j] = a[j - step];
+                else
+                    break;
+            }
+            a[j] = tmp;
+        }
+    return countComp;
+}
+
 
 int cmp_int(const void *a, const void *b) {
     return *(const int *) a - *(const int *) b;
@@ -176,6 +296,73 @@ void _radixSort(int *l, int *r, int N) {
 void radix_Sort(int *a, size_t n) {
     _radixSort(a, a + n, 8);
 }
+void rad_sort_u(unsigned *begin, unsigned *end, unsigned bit) {
+    if (!bit || end < begin + 1)
+        return;
+
+    unsigned *ll = begin;
+    unsigned *rr = end - 1;
+    while (1) {
+        while (ll < rr && !(*ll & bit))
+            ll++;
+        while (ll < rr && (*rr & bit))
+            rr--;
+        if (ll >= rr)
+            break;
+        swap(ll, rr, sizeof(int));
+    }
+
+    if (!(bit & *ll) && ll < end)
+        ll++;
+
+    bit >>= 1;
+
+    rad_sort_u(begin, ll, bit);
+    rad_sort_u(ll, end, bit);
+}
+
+long long rad_sort_uN(unsigned *begin, unsigned *end, unsigned bit) {
+    long long countComp = 0;
+    if (!bit && ++countComp || end < begin + 1 && ++countComp)
+        return countComp;
+
+    unsigned *ll = begin;
+    unsigned *rr = end - 1;
+    while (++countComp) {
+        while (ll < rr && ++countComp && !(*ll & bit) && ++countComp)
+            ll++;
+        while (ll < rr && ++countComp && (*rr & bit) && ++countComp)
+            rr--;
+        if (ll >= rr && ++countComp)
+            break;
+        swap(ll, rr, sizeof(int));
+    }
+
+    if (!(bit & *ll) && ++countComp && ll < end && ++countComp)
+        ll++;
+
+    bit >>= 1;
+
+    rad_sort_uN(begin, ll, bit);
+    rad_sort_uN(ll, end, bit);
+
+    return countComp;
+}
+
+long long radix_sortN(int *a, const size_t size) {
+    unsigned *x = (unsigned *) a;
+
+    long long countComp = 0;
+    for (size_t i = 0; i < size && ++countComp; i++)
+        x[i] ^= INT_MIN;
+
+    countComp += rad_sort_uN(x, x + size, INT_MIN);
+
+    for (size_t i = 0; i < size && ++countComp; i++)
+        x[i] ^= INT_MIN;
+
+    return countComp;
+}
 
 void merge(const int *a, const size_t n,
            const int *b, const size_t m, int *c) {
@@ -191,6 +378,23 @@ void merge(const int *a, const size_t n,
     }
 }
 
+long long mergeN(const int *a, const size_t n,
+                 const int *b, const size_t m, int *c) {
+    long long countComp = 0;
+    int i = 0, j = 0;
+    while (i < n && ++countComp || j < m && ++countComp) {
+        if (j == m && ++countComp || i < n && ++countComp && a[i] < b[j] && ++countComp) {
+            c[i + j] = a[i];
+            i++;
+        } else {
+            c[i + j] = b[j];
+            j++;
+        }
+    }
+    return countComp;
+}
+
+
 void mergeSort_(int *source, size_t l, size_t r, int *buffer) {
     size_t n = r - l;
     if (n <= 1)
@@ -204,10 +408,35 @@ void mergeSort_(int *source, size_t l, size_t r, int *buffer) {
     memcpy(source + l, buffer, sizeof(int) * n);
 }
 
+long long mergeSortN_(int *source, size_t l, size_t r, int *buffer) {
+    size_t n = r - l;
+    long long countComp = 0;
+    if (n <= 1 && ++countComp)
+        return countComp;
+
+    size_t m = (l + r) / 2;
+    mergeSort_(source, l, m, buffer);
+    mergeSort_(source, m, r, buffer);
+
+    countComp = mergeN(source + l, m - l, source + m, r - m, buffer);
+    memcpy(source + l, buffer, sizeof(int) * n);
+
+    return countComp;
+}
+
+
 void mergeSort(int *a, size_t n) {
     int *buffer = (int *) malloc(sizeof(int) * n);
     mergeSort_(a, 0, n, buffer);
     free(buffer);
+}
+
+long long mergeSortN(int *a, size_t n) {
+    int *buffer = (int *) malloc(sizeof(int) * n);
+    long long countComp = mergeSortN_(a, 0, n, buffer);
+    free(buffer);
+
+    return countComp;
 }
 
 
@@ -232,6 +461,32 @@ void quicksort(int *A, size_t len) {
 
     quicksort(A, i);
     quicksort(A + i, len - i);
+}
+
+long long quicksortN(int *A, size_t len) {
+    long long countComp = 0;
+    if (len < 2 && ++countComp)
+        return countComp;
+
+    int pivot = A[len / 2];
+
+    int i, j;
+    for (i = 0, j = len - 1; ++countComp; i++, j--) {
+        while (A[i] < pivot && ++countComp)
+            i++;
+        while (A[j] > pivot && ++countComp)
+            j--;
+
+        if (i >= j && ++countComp)
+            break;
+
+        swap(A + i, A + j, sizeof(int));
+    }
+
+    countComp += quicksortN(A, i);
+    countComp += quicksortN(A + i, len - i);
+
+    return countComp;
 }
 
 void generateRandomArray(int *a, size_t size) {
@@ -278,46 +533,96 @@ void heapSort(int *arr, size_t n) {
     }
 }
 
+long long heapifyN(int *arr, int n, int i) {
+    long long countComp = 0;
+    int largest = i;
+    int l = 2 * i + 1;
+    int r = 2 * i + 2;
+
+    if (l < n && ++countComp && arr[l] > arr[largest] && ++countComp)
+        largest = l;
+
+    if (r < n && ++countComp && arr[r] > arr[largest] && ++countComp)
+        largest = r;
+
+    if (largest != i && ++countComp) {
+        swap(&arr[i], &arr[largest], sizeof(int));
+
+        countComp += heapifyN(arr, n, largest);
+    }
+
+    return countComp;
+}
+
+long long heapSortN(int *arr, size_t n) {
+    long long countComp = 0;
+    for (int i = n / 2 - 1; i >= 0 && ++countComp; i--)
+        countComp += heapifyN(arr, n, i);
+
+    for (int i = n - 1; i >= 0 && ++countComp; i--) {
+        swap(&arr[0], &arr[i], sizeof(int));
+
+        countComp += heapifyN(arr, i, 0);
+    }
+    return countComp;
+}
+
 ////////////////////////////////////////////////////
 
 void timeExperiment() {
-    SortFunc sorts[] = {
-            {selectionSort, "selectionSort"},
-            {insertionSort, "insertionSort"},
-            {bubbleSort,    "bubbleSort"},
-            {combsort,      "combSort"},
-            {shellSort, "shellSort"},
-            {quicksort, "quickSort"},
-            {mergeSort, "mergeSort"},
-            {radix_Sort, "radixSort"},
-            {heapSort, "heapSort"},
+    nCompSort nComps[] = {
+            {selectionSortN, "selectionSortN"},
+            {insertionSortN, "insertionSortN"},
+            {bubbleSortN,    "bubbleSortN"},
+            {combsortN,      "combSortN"},
+            {shellSortN,     "shellSortN"},
+            {radix_sortN,    "radixSortN"},
+            {mergeSortN,     "mergeSortN"},
+            {heapSortN,      "heapSortN"},
+            {quicksortN,     "quickSortN"},
     };
-    const unsigned FUNCS_N = ARRAY_SIZE(sorts);
+
+    const unsigned COMPS_N = ARRAY_SIZE(nComps);
 
     // описание функций генерации
     GeneratingFunc generatingFuncs[] = {
-            // генерируется случайный массив
             {generateRandomArray,      "random"},
-            // генерируется массив 0, 1, 2, ..., n - 1
             {generateOrderedArray,     "ordered"},
-            // генерируется массив n - 1, n - 2, ..., 0
             {generateOrderedBackwards, "orderedBackwards"}
     };
     const unsigned CASES_N = ARRAY_SIZE(generatingFuncs);
 
     // запись статистики в файл
+//    for (size_t size = 10000; size <= 100000; size += 10000) {
+//        printf(" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n");
+//        printf("Size : %d\n", size);
+//        for (int i = 0; i < FUNCS_N; i++) {
+//            for (int j = 0; j < CASES_N; j++) {
+//                // генерация имени файла
+//                static char filename[128];
+//                sprintf(filename, "%s_%s_time",
+//                        sorts[i].name, generatingFuncs[j].name);
+//                checkTime(sorts[i].sort,
+//                          generatingFuncs[j].generate,
+//                          size, filename, sorts[i].name);
+//            }
+//        }
+//        printf("\n");
+//    }
+
+    // запись статистики в файл
     for (size_t size = 10000; size <= 100000; size += 10000) {
         printf(" - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n");
         printf("Size : %d\n", size);
-        for (int i = 0; i < FUNCS_N; i++) {
+        for (int i = 0; i < COMPS_N; i++) {
             for (int j = 0; j < CASES_N; j++) {
                 // генерация имени файла
                 static char filename[128];
                 sprintf(filename, "%s_%s_time",
-                        sorts[i].name, generatingFuncs[j].name);
-                checkTime(sorts[i].sort,
-                          generatingFuncs[j].generate,
-                          size, filename);
+                        nComps[i].name, generatingFuncs[j].name);
+                checkNComp(nComps[i].nComp,
+                           generatingFuncs[j].generate,
+                           size, filename, nComps[i].name);
             }
         }
         printf("\n");
@@ -326,5 +631,6 @@ void timeExperiment() {
 
 int main() {
     timeExperiment();
+
     return 0;
 }
