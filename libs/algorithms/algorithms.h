@@ -3,11 +3,16 @@
 #define SORTMESURE_ALGORITHMS_H
 
 #include <stdio.h>
-
-// обменивает a и b размера size
+#include <stdbool.h>
 void swap(void *a, void *b, size_t size);
 
 int max2(int x, int y);
 
 int min2(int x, int y);
+
+void outputArray_(const int *a, size_t size);
+
+void swap_ (int *a , int * b );
+
+bool isOrdered(const int *a, size_t size);
 #endif //SORTMESURE_ALGORITHMS_H

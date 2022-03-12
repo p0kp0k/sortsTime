@@ -19,7 +19,11 @@ void swap(void *a, void *b, size_t size) {
         pb += 1;
     }
 }
-
+void swap_ (int *a , int * b ) {
+    int t = * a ;
+    * a = * b ;
+    * b = t ;
+}
 double absf(const double x) {
     return x > 0 ? x : -x;
 }
@@ -71,12 +75,15 @@ int max2(const int x, const int y) {
     return x ^ ((x ^ y) & -(x < y));
 }
 
-int isDegreeOf2(const int x) {
-    return x && !(x & (x - 1));
+void outputArray_(const int *a, size_t size) {
+    for (size_t i = 0; i < size; i++)
+        printf("%d ", a[i]);
+    printf("\n");
 }
 
-int randit(int a, int b) {
-    srand(time(0));
-
-    return rand() % b + a;
+bool isOrdered(const int *a, size_t size) {
+    for (int i = 0; i < size - 1; i++)
+        if (a[i] > a[i + 1])
+            return false;
+    return true;
 }
